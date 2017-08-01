@@ -5,10 +5,119 @@ import pystan, numpy, patsy, os
 import re, io, contextlib
 
 class EdstanData:
+    """Data arranged for compatibility with the edstan models.
+
+    Input formats:
+        Item response data may be provided in 'wide' or 'long' form. 
+        For wide-form data, scored responses are contained in a response matrix in 
+        which the rows 
+        represent persons and the columns represent items. The response matrix is
+        passed to the `response_matrix` argument, and the arguments `item_id`,
+        `person_id`, and `y` are not used. The response matrix should be a 
+        two-dimensional numpy array or an object that is convertible to the same.
+        
+        Long-form data consist of a scored response vector along with two vectors
+        serving as person and item indicators. In this case, arguments `y`, 
+        `item_id`, and `person_id` are provided. Each should be a one-dimensional
+        numpy array or  an object that is convertible to the same. Further, 
+        `item_id` and `person_id` must contain consective integers with the
+        lowest values equalling one (not zero).
+    
+        Whichever format the original data are in, the scored responses should 
+        have a lowest value of zero for any given item and should not contain 
+        missing response categories. (For example, if an item has three response
+        categories, then the scores 0, 1, and 2 should be found in the data at least
+        once.) These caveats may not apply to rating scale models. Also, the 
+        scored responses may contain missing values.
+        
+    Latent regression:
+        A latent regression of person ability on covariates may optionally be 
+        included in one of two ways. First, a design matrix for the latent 
+        regression may be supplied directly to the `person_data` argument while
+        omitting the `formula` argument. This matrix should be a two-dimensional
+        numpy array or an object that is convertible to the same. The first column 
+        must have all elements equal to one to serve as the model intercept. 
+        
+        Alternatively, both `person_data` and `formula` may be specified for the
+        latent regression. In this 
+        case, `person_data` should be a data structure compatible with 
+        `patsy.dmatrix()`, such as a pandas data frame, and `formula` should
+        be a string formula also compatible with `patsy.dmatrix()`. In the event
+        that both `person_data` and `formula` are omitted, the latent regression
+        is restricted to the model intercept only.
+
+    Args:
+        response_matrix (optional): 
+            An object containing scored response that 
+            can be converted to a two-dimensional numpy array. The rows 
+            represent persons and the columns represent items. If provided, 
+            `item_id`, `person_id`, and `y` are ignored.
+        item_id (optional): 
+            An object indexing the items that can be 
+            converted to a one-dimensional numpy array. Used instead of
+            `response_matrix` and must be of same length as `y`.
+        person_id (optional): 
+            An object indexing the persons that can be 
+            converted to a one-dimensional numpy array. Used instead of
+            `response_matrix` and must be of same length as `y`.
+        y (optional): 
+            An object containing scored responses that can be 
+            converted to a one-dimensional numpy array. Used along with
+            `item_id` and `person_id`.
+        person_data (optional): 
+            An object containing person covariates that 
+            is compatible with `patsy.`. Must have
+            a number of rows equal to either the number of rows in
+            `response_matrix` or the length of `y`. If provided without 
+            `formula`, the first column must have all elements equal to one to
+            serve as the model intercept.
+        formula (optional): 
+            A string that is a patsy-style formula applied to
+            `person_data`.
+
+    Attributes:
+        datalist: The data as arrange for the edstan models.
+        
+    Examples:
+        Use pandas to import the spelling data as a data frame with one
+        row per person. Four columns correspond to item responses, and a
+        fifth column is a dummy variable for whether the respondent is male.
+
+        >>> import pandas
+        >>> spelling = pandas.read_csv('spelling.csv')
+        >>> words = ['infidelity', 'panoramic', 'succumb', 'girder']
+        
+        Get EdstanData objects for fitting models with and without the
+        latent regression on person covariates.
+        
+        >>> ed_1 = edstan.EdstanData(response_matrix = spelling[words])
+        >>> ed_2 = edstan.EdstanData(response_matrix = spelling[words],
+        >>>                          person_data = spelling['male'],
+        >>>                          formula = '~male')
+        
+        Use pandas to import the verbal aggression data as a data frame with
+        one row per response. The columns include the scored response,
+        item indicator, person indicator, and person-related covariates.
+        
+        >>> import pandas
+        >>> aggression = pandas.read_csv('aggression.csv')
+        
+        Get EdstanData objects for fitting models with and without the
+        latent regression on person covariates.
+        
+        >>> ed_3 = edstan.EdstanData(item_id = aggression['item'], 
+        >>>                          person_id = aggression['person'],
+        >>>                          y = aggression['poly'])
+        >>> ed_4 = edstan.EdstanData(item_id = aggression['item'], 
+        >>>                          person_id = aggression['person'],
+        >>>                          y = aggression['poly'],
+        >>>                          person_data = aggression[['male', 'anger']],
+        >>>                          formula = '~ male + anger')
+    """
     
     def __init__(self, response_matrix=None, item_id=None, person_id=None, 
                  y=None, person_data=None, formula=None):
-        
+
         # Convert basic parts to numpy arrays and get I and J
         if response_matrix is None:
             y_raw = numpy.asarray(y)
@@ -73,7 +182,6 @@ class EdstanData:
 
         self.datalist = {'N': N, 'I': I, 'J': J, 'y': y, 'ii': ii, 'jj': jj, 
                          'K': K, 'W': W}
-        self.__table__ = 'No model fit'
     
     def __str__(self):
         
@@ -81,6 +189,11 @@ class EdstanData:
        pass
     
     def max_score_item(self):
+        """Provides the maximum score for each item.
+            
+        Returns:
+            A list of maximum scores.
+        """
         
         max_score = [0] * self.datalist['I']
         for n in range(self.datalist['N']):
@@ -89,6 +202,21 @@ class EdstanData:
         return max_score
 
     def beta_key(self, rating_scale=False):
+        """Provides a map indicating which item difficulties correspond to
+        which items.
+        
+        This is mainly useful for the (generalized) partial credit model, 
+        where items will have more than one dificulty parameter.
+        
+        Args:
+            rating_scale (optional): 
+                Whether a map is wanted for the (generalized) rating scale
+                model. Default is false.
+            
+        Returns:
+            A list of ranges. Each range provides the index of betas for a
+            given item.
+        """
         
         if rating_scale is True:
             n_betas_per_item = numpy.tile(1, self.datalist['I'])
@@ -103,6 +231,11 @@ class EdstanData:
         return key
             
     def raw_scores(self):
+        """Provides each respondent's raw score.
+            
+        Returns:
+            A list of raw scores.
+        """
         
         raw_scores = [0] * self.datalist['J']
         for n in range(self.datalist['N']):
@@ -111,6 +244,37 @@ class EdstanData:
         return raw_scores
     
     def fit_model(self, model, output=True, **kwargs):
+        """Fits a Stan model to an EdstanData object.
+
+        The available models are the Rasch, rating scale, partical credit,
+        two-parameter logistic, generalized rating scale, and generalized
+        partial credit models.
+
+        Args:
+            model: 
+                The choice of model ('rasch', 'rsm', 'pcm', '2pl', 'grsm',
+                or 'gpcm').
+            Output (optional): 
+                Whether to print output after fitting the model. Default
+                is True.
+            **kwargs (optional): 
+                Additional parameters passed to `pystan.stan()`. In
+                particular, choices for `iter` and `chains` should
+                be supplied.
+            
+        Returns:
+            A `pystan.StanFit4model` instance.
+            
+        Examples:
+            Import the spelling data, create an `EdstanData` instance, and fit
+            the Rasch model.
+    
+            >>> import pandas
+            >>> spelling = pandas.read_csv('spelling.csv')
+            >>> words = ['infidelity', 'panoramic', 'succumb', 'girder']
+            >>> ed_1 = edstan.EdstanData(response_matrix = spelling[words])
+            >>> ed_1.fit_model('rasch', iter=200, chains=4)
+        """
         
         def full_path(file):
             here = os.path.dirname(__file__)
@@ -149,6 +313,19 @@ class EdstanData:
         return fit
     
     def print_from_fit(self, fit):
+        """Prints output for a Stan model.
+
+        The benefit of using this over the default `print` for a 
+        `pystan.StanFit4model` instance is that summaries of item parameter
+        posteriors will be grouped by item, and also that the displayed
+        parameter summaries are filtered to include only those of likely
+        interest. This output is provided by default when a model is fit.
+
+        Args:
+            fit: 
+                A `pystan.StanFit4model` instance generated by 
+                `EdstanData.fit_model()`.
+        """        
         
         raw_print = io.StringIO()
         with contextlib.redirect_stdout(raw_print):
