@@ -50,3 +50,6 @@ edstan/__pycache__/*
 test.py
 temp.py
 .spyproject/*
+
+.idea/*
+env/*
