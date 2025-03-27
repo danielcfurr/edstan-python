@@ -53,3 +53,8 @@ temp.py
 
 .idea/*
 env/*
+
+edstan/data/*
+!edstan/data/*.stan
+
+bernoulli*
