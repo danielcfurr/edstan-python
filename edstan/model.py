@@ -7,7 +7,7 @@ from cmdstanpy import CmdStanModel
 from numpy.typing import NDArray
 from pandas import DataFrame
 
-from .ed_stan_mcmc import EdStanMCMC
+from .mcmc import EdStanMCMC
 
 
 class EdStanModel(CmdStanModel):
@@ -143,6 +143,9 @@ def _validate_responses_by_item(y: NDArray, ii_ints: NDArray, ii_labels: NDArray
 
         if min(responses) != 0:
             warn(f"Item {label} does not have a minimum response value of zero.")
+
+        if len(np.unique(responses)) == 1:
+            warn(f"Item {label} only has response values of {responses[0]}.")
 
         if len(np.unique(responses)) != (max(responses) - min(responses) + 1):
             warn(f"Item {label} has missing response categories.")

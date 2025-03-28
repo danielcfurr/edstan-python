@@ -1,1 +1,2 @@
-from .ed_stan_model import EdStanModel
+from .model import EdStanModel
+from .mcmc import EdStanMCMC
