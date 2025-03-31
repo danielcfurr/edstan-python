@@ -1,5 +1,5 @@
 import os
-from typing import Union
+from typing import Union, Dict
 from warnings import warn
 
 import numpy as np
@@ -28,12 +28,13 @@ class EdStanModel(CmdStanModel):
 
         super().__init__(stan_file=matching_files[0], **kwargs)
 
-    def sample_from_long(self,
+
+    def data_from_long(self,
                          ii: NDArray[int],
                          jj: NDArray[int],
                          y: NDArray[int],
-                         integerize: bool = True, **kwargs
-                         ) -> EdStanMCMC:
+                         integerize: bool = True,
+                         ) -> Dict:
         ii = _validate_integer_vector(ii, label='ii')
         jj = _validate_integer_vector(jj, label='jj')
         y = _validate_integer_vector(y, label='y')
@@ -58,14 +59,15 @@ class EdStanModel(CmdStanModel):
             "jj": jj_ints,
             "y": y,
             "K": 1,
-            "W": [[1]] * max(jj)
+            "W": [[1]] * max(jj_ints),
+            "ii_labels": ii_labels,
+            "jj_labels": jj_labels,
         }
 
-        mcmc = super().sample(data=data, **kwargs)
+        return data
 
-        return EdStanMCMC(mcmc, jj_labels=jj_labels, ii_labels=ii_labels)
 
-    def sample_from_wide(self, response_matrix: Union[NDArray, DataFrame], **kwargs) -> EdStanMCMC:
+    def data_from_wide(self, response_matrix: Union[NDArray, DataFrame]) -> Dict:
         if isinstance(response_matrix, DataFrame):
             mat = _validate_pandas_matrix(response_matrix)
             ii = np.tile(response_matrix.columns, mat.shape[0])
@@ -77,7 +79,34 @@ class EdStanModel(CmdStanModel):
 
         y = mat.flatten()
 
-        return self.sample_from_long(ii=ii, jj=jj, y=y, integerize=True, **kwargs)
+        data = self.data_from_long(ii=ii, jj=jj, y=y, integerize=True)
+
+        return data
+
+
+    def sample_from_long(self,
+                         ii: NDArray[int],
+                         jj: NDArray[int],
+                         y: NDArray[int],
+                         integerize: bool = True, **kwargs
+                         ) -> EdStanMCMC:
+        ii = _validate_integer_vector(ii, label='ii')
+        jj = _validate_integer_vector(jj, label='jj')
+        y = _validate_integer_vector(y, label='y')
+
+        data = self.data_from_long(ii=ii, jj=jj, y=y, integerize=integerize)
+
+        mcmc = super().sample(data=data, **kwargs)
+
+        return EdStanMCMC(mcmc, jj_labels=data['jj_labels'], ii_labels=data['ii_labels'])
+
+
+    def sample_from_wide(self, response_matrix: Union[NDArray, DataFrame], **kwargs) -> EdStanMCMC:
+        data = self.data_from_wide(response_matrix=response_matrix)
+
+        mcmc = super().sample(data=data, **kwargs)
+
+        return EdStanMCMC(mcmc, jj_labels=data['jj_labels'], ii_labels=data['ii_labels'])
 
 
 def _unique_unsorted(arr: NDArray):
