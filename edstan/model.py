@@ -10,19 +10,20 @@ from .mcmc import EdStanMCMC
 
 class EdStanModel(CmdStanModel):
     """
-    This class is a child of the CmdStanModel class that adds functionality to load common item response models
-    and accept data in common formats to perform MCMC sampling.
+    This class is a child of :class:`pystan.CmdStanModel` that adds functionality to load common item response models
+    and accept data in common formats to perform MCMC sampling. Only the added functionality is documented here.
     """
     def __init__(self, model: str, **kwargs):
         """
-        Initializes an EdStanModel instance.
+        Initializes an :class:`EdStanModel` instance.
 
-        Upon instantiating an EdStanModel instance, the selected model is prepared for sampling. Afterwards, the
-        'sample_from_long' or 'sample_from_wide' methods may be used to initiate MCMC sampling with Stan.
+        Upon instantiating an :class:`EdStanModel` instance, the selected model is prepared for sampling. Afterwards,
+        the :meth:`EdStanModel.sample_from_long` or :meth:`EdStanModel.sample_from_wide` methods may be used to
+        initiate MCMC sampling with Stan.
 
-        :param model: The (partial) file name of an edstan model, with matching based on the start of the file name.
+        :param model: The (partial) file name of an :mod:`edstan` model, with matching based on the start of the file name.
             Consider specifying "rasch", "2pl", "rsm", "grsm", "pcm", or "gpcm".
-        :param kwargs: Additional optional arguments passed to the CmdStanModel parent class.
+        :param kwargs: Additional optional arguments passed to the :class:`pystan.CmdStanModel` parent class.
         """
         if not isinstance(model, str):
             raise ValueError("Invalid value for 'model'. Expected a string.")
@@ -46,12 +47,12 @@ class EdStanModel(CmdStanModel):
         """
         Sample from the model using a dictionary of data.
 
-        Generally it will be more convenient to initialize sampling using the EdStanModel.sample_from_long() or
-        EdStanModel.sample_from_wide() methods, which prepare the required dictionary based on common data formats.
+        Generally it will be more convenient to initialize sampling using the :meth:`EdStanModel.sample_from_long`
+        or :meth:`EdStanModel.sample_from_wide` methods, which prepare the required dictionary based on common data formats.
 
-        :param data: A dictionary of data compatible with the edstan models.
-        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
-            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :param data: A dictionary of data compatible with the :mod:`edstan` models.
+        :param kwargs: Additional arguments passed to :meth:`pystan.CmdStanModel.sample`, excluding 'data'. Consider
+            arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
         """
         ii_labels = data.pop('ii_labels')
@@ -63,7 +64,7 @@ class EdStanModel(CmdStanModel):
     def sample_from_long(self,
                          ii: NDArray,
                          jj: NDArray,
-                         y: NDArray[int],
+                         y: NDArray[np.integer],
                          integerize: bool = True, **kwargs
                          ) -> EdStanMCMC:
         """
@@ -73,16 +74,16 @@ class EdStanModel(CmdStanModel):
         array, and additional flat arrays index the person and item associated with each scored response. This format
         can accommodate missing responses by removing them beforehand.
 
-        :param ii: A 1D NumPy array of shape (n,) representing the item associated with a response. Must be integers
+        :param ii: A 1D NumPy array representing the item associated with a response. Must be integers
             if 'integerize' is set to False.
-        :param jj: A 1D NumPy array of shape (n,) representing the person associated with a response. Must be integers
+        :param jj: A 1D NumPy array representing the person associated with a response. Must be integers
             if 'integerize' is set to False.
-        :param y: A 1D NumPy array of shape (n,) representing the scored responses. The lowest value is expected to be
+        :param y: A 1D NumPy array representing the scored responses. The lowest value is expected to be
             zero.
         :param integerize: Whether to convert 'ii' and 'jj' to index vectors starting at one. This should generally
             be set to True.
-        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
-            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :param kwargs: Additional arguments passed to :meth:`pystan.CmdStanModel.sample`, excluding 'data'. Consider
+            arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
         """
         ii = _validate_vector(ii, label='ii')
@@ -91,17 +92,17 @@ class EdStanModel(CmdStanModel):
         data = data_from_long(ii=ii, jj=jj, y=y, integerize=integerize, extended=True)
         return self.sample_from_dict(data, **kwargs)
 
-    def sample_from_wide(self, response_matrix: Union[NDArray, DataFrame], **kwargs) -> EdStanMCMC:
+    def sample_from_wide(self, response_matrix: Union[NDArray[np.integer], DataFrame], **kwargs) -> EdStanMCMC:
         """
-        Sample from the model using response data in the form of a 2D array or dataframe.
+        Sample from the model using response data in the form of a 2D array or :class:`pandas.DataFrame`.
 
         This method is appropriate for "wide format" item response data in which scored response are arrange in a table.
         Each row represents a person, and each column represents an item.
 
-        :param response_matrix: A (#persons, #items) 2D array or dataframe representing the scored responses. The lowest
-            value is expected to be zero.
-        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
-            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :param response_matrix: A (#persons, #items) 2D array or :class:`pandas.DataFrame` representing the scored
+            responses. The lowest value is expected to be zero.
+        :param kwargs: Additional arguments passed to :meth:`pystan.CmdStanModel.sample`, excluding 'data'. Consider
+            arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
         """
         data = data_from_wide(response_matrix=response_matrix, extended=True)
@@ -110,22 +111,22 @@ class EdStanModel(CmdStanModel):
 
 def data_from_long(ii: NDArray,
                    jj: NDArray,
-                   y: NDArray[int],
+                   y: NDArray[np.integer],
                    integerize: bool = True,
                    extended: bool = False,
                    ) -> Dict:
     """
-    Create a dictionary compatible with the edstan models from several 1D arrays.
+    Create a dictionary compatible with the :mod:`edstan` models from several 1D arrays.
 
-    In general the EdStanModel.sample_from_long() method from the EdStanModel class will be sufficient for preparing
+    In general the :meth:`EdStanModel.sample_from_long` method will be sufficient for preparing
     data of this format and performing sampling. This function may be of interest if a copy of the prepared data is
     desired.
 
-    :param ii: A 1D NumPy array of shape (n,) representing the item associated with a response. Must be integers
+    :param ii: A 1D NumPy representing the item associated with a response. Must be integers
         if 'integerize' is set to False.
-    :param jj: A 1D NumPy array of shape (n,) representing the person associated with a response. Must be integers
+    :param jj: A 1D NumPy array representing the person associated with a response. Must be integers
         if 'integerize' is set to False.
-    :param y: A 1D NumPy array of shape (n,) representing the scored responses. The lowest value is expected to be
+    :param y: A 1D NumPy array representing the scored responses. The lowest value is expected to be
         zero.
     :param integerize: Whether to convert 'ii' and 'jj' to index vectors starting at one. This should generally
         be set to True.
@@ -170,16 +171,16 @@ def data_from_long(ii: NDArray,
     return data
 
 
-def data_from_wide(response_matrix: Union[NDArray, DataFrame], extended: bool = False) -> Dict:
+def data_from_wide(response_matrix: Union[NDArray[np.integer], DataFrame], extended: bool = False) -> Dict:
     """
-    Create a dictionary compatible with the edstan models from a response matrix.
+    Create a dictionary compatible with the :mod:`edstan` models from a response matrix.
 
-    In general the EdStanModel.sample_from_wide() method from the EdStanModel class will be sufficient for preparing
+    In general the :meth:`EdStanModel.sample_from_wide` method will be sufficient for preparing
     data of this format and performing sampling. This function may be of interest if a copy of the prepared data is
     desired.
 
-    :param response_matrix: A (#persons, #items) 2D array or dataframe representing the scored responses. The lowest
-        value is expected to be zero.
+    :param response_matrix: A (#persons, #items) array or :class:`pandas.DataFrame` representing the scored responses.
+        The lowest value is expected to be zero.
     :param extended: Whether to add additional metadata keys to the output dictionary. This should generally be set
         to False if called by the user.
     :return: A dictionary representing item response data.

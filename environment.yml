@@ -4,6 +4,7 @@ dependencies:
   - python = 3.12
   - pylint
   - pytest
+  - sphinx
   - cmdstanpy
   - numpy
   - pandas
