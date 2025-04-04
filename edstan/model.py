@@ -9,9 +9,23 @@ from .mcmc import EdStanMCMC
 
 
 class EdStanModel(CmdStanModel):
+    """
+    This class is a child of the CmdStanModel class that adds functionality to load common item response models
+    and accept data in common formats to perform MCMC sampling.
+    """
     def __init__(self, model: str, **kwargs):
+        """
+        Initializes an EdStanModel instance.
+
+        Upon instantiating an EdStanModel instance, the selected model is prepared for sampling. Afterwards, the
+        'sample_from_long' or 'sample_from_wide' methods may be used to initiate MCMC sampling with Stan.
+
+        :param model: The (partial) file name of an edstan model, with matching based on the start of the file name.
+            Consider specifying "rasch", "2pl", "rsm", "grsm", "pcm", or "gpcm".
+        :param kwargs: Additional optional arguments passed to the CmdStanModel parent class.
+        """
         if not isinstance(model, str):
-            raise ValueError(f"Invalid value for 'model': {model}. Expected a string.")
+            raise ValueError("Invalid value for 'model'. Expected a string.")
 
         directory = os.path.join(os.path.dirname(__file__), 'data')
         matching_files = []
@@ -21,18 +35,56 @@ class EdStanModel(CmdStanModel):
 
         if len(matching_files) == 0:
             raise ValueError(f"Invalid value for 'model': {model}. No matching edstan model found.")
+
         if len(matching_files) > 1:
             raise ValueError(f"Invalid value for 'model': {model}. More than one matching edstan model found.")
 
         self.model = matching_files[0]
         super().__init__(stan_file=matching_files[0], **kwargs)
 
+    def sample_from_dict(self, data: Dict, **kwargs) -> EdStanMCMC:
+        """
+        Sample from the model using a dictionary of data.
+
+        Generally it will be more convenient to initialize sampling using the EdStanModel.sample_from_long() or
+        EdStanModel.sample_from_wide() methods, which prepare the required dictionary based on common data formats.
+
+        :param data: A dictionary of data compatible with the edstan models.
+        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
+            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :return: A fitted MCMC model.
+        """
+        ii_labels = data.pop('ii_labels')
+        jj_labels = data.pop('jj_labels')
+        max_per_item = data.pop('max_per_item')
+        mcmc = super().sample(data=data, **kwargs)
+        return EdStanMCMC(mcmc, jj_labels=jj_labels, ii_labels=ii_labels, max_per_item=max_per_item)
+
     def sample_from_long(self,
-                         ii: NDArray[int],
-                         jj: NDArray[int],
+                         ii: NDArray,
+                         jj: NDArray,
                          y: NDArray[int],
                          integerize: bool = True, **kwargs
                          ) -> EdStanMCMC:
+        """
+        Sample from the model using response data in the form of several 1D arrays.
+
+        This method is appropriate for "long format" item response data in which scored responses are stored in a flat
+        array, and additional flat arrays index the person and item associated with each scored response. This format
+        can accommodate missing responses by removing them beforehand.
+
+        :param ii: A 1D NumPy array of shape (n,) representing the item associated with a response. Must be integers
+            if 'integerize' is set to False.
+        :param jj: A 1D NumPy array of shape (n,) representing the person associated with a response. Must be integers
+            if 'integerize' is set to False.
+        :param y: A 1D NumPy array of shape (n,) representing the scored responses. The lowest value is expected to be
+            zero.
+        :param integerize: Whether to convert 'ii' and 'jj' to index vectors starting at one. This should generally
+            be set to True.
+        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
+            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :return: A fitted MCMC model.
+        """
         ii = _validate_vector(ii, label='ii')
         jj = _validate_vector(jj, label='jj')
         y = _validate_vector(y, label='y')
@@ -40,23 +92,47 @@ class EdStanModel(CmdStanModel):
         return self.sample_from_dict(data, **kwargs)
 
     def sample_from_wide(self, response_matrix: Union[NDArray, DataFrame], **kwargs) -> EdStanMCMC:
+        """
+        Sample from the model using response data in the form of a 2D array or dataframe.
+
+        This method is appropriate for "wide format" item response data in which scored response are arrange in a table.
+        Each row represents a person, and each column represents an item.
+
+        :param response_matrix: A (#persons, #items) 2D array or dataframe representing the scored responses. The lowest
+            value is expected to be zero.
+        :param kwargs: Additional arguments passed to the sample method of the CmdStanModel parent class, excluding
+            'data'. Consider arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
+        :return: A fitted MCMC model.
+        """
         data = data_from_wide(response_matrix=response_matrix, extended=True)
         return self.sample_from_dict(data, **kwargs)
 
-    def sample_from_dict(self, data: Dict, **kwargs) -> EdStanMCMC:
-        ii_labels = data.pop('ii_labels')
-        jj_labels = data.pop('jj_labels')
-        max_per_item = data.pop('max_per_item')
-        mcmc = super().sample(data=data, **kwargs)
-        return EdStanMCMC(mcmc, jj_labels=jj_labels, ii_labels=ii_labels, max_per_item=max_per_item)
 
-
-def data_from_long(ii: NDArray[int],
-                   jj: NDArray[int],
+def data_from_long(ii: NDArray,
+                   jj: NDArray,
                    y: NDArray[int],
                    integerize: bool = True,
                    extended: bool = False,
                    ) -> Dict:
+    """
+    Create a dictionary compatible with the edstan models from several 1D arrays.
+
+    In general the EdStanModel.sample_from_long() method from the EdStanModel class will be sufficient for preparing
+    data of this format and performing sampling. This function may be of interest if a copy of the prepared data is
+    desired.
+
+    :param ii: A 1D NumPy array of shape (n,) representing the item associated with a response. Must be integers
+        if 'integerize' is set to False.
+    :param jj: A 1D NumPy array of shape (n,) representing the person associated with a response. Must be integers
+        if 'integerize' is set to False.
+    :param y: A 1D NumPy array of shape (n,) representing the scored responses. The lowest value is expected to be
+        zero.
+    :param integerize: Whether to convert 'ii' and 'jj' to index vectors starting at one. This should generally
+        be set to True.
+    :param extended: Whether to add additional metadata keys to the output dictionary. This should generally be set
+        to False if called by the user.
+    :return: A dictionary representing item response data.
+    """
     ii = _validate_vector(ii, label='ii')
     jj = _validate_vector(jj, label='jj')
     y = _validate_vector(y, label='y')
@@ -95,6 +171,19 @@ def data_from_long(ii: NDArray[int],
 
 
 def data_from_wide(response_matrix: Union[NDArray, DataFrame], extended: bool = False) -> Dict:
+    """
+    Create a dictionary compatible with the edstan models from a response matrix.
+
+    In general the EdStanModel.sample_from_wide() method from the EdStanModel class will be sufficient for preparing
+    data of this format and performing sampling. This function may be of interest if a copy of the prepared data is
+    desired.
+
+    :param response_matrix: A (#persons, #items) 2D array or dataframe representing the scored responses. The lowest
+        value is expected to be zero.
+    :param extended: Whether to add additional metadata keys to the output dictionary. This should generally be set
+        to False if called by the user.
+    :return: A dictionary representing item response data.
+    """
     if isinstance(response_matrix, DataFrame):
         mat = _validate_pandas_matrix(response_matrix)
         ii = np.tile(response_matrix.columns, mat.shape[0])
@@ -110,10 +199,12 @@ def data_from_wide(response_matrix: Union[NDArray, DataFrame], extended: bool = 
 
 
 def _unique_unsorted(arr: NDArray):
+    """Given a 1D array, return the unique elements in the order of first observance."""
     return np.array([x for i, x in enumerate(arr) if x not in arr[:i]])
 
 
 def _map_to_unique_ids(arr: NDArray):
+    """Turn a 1D array into a tuple of an index and the unique values."""
     unique_values = _unique_unsorted(arr)
     unique_values_list = unique_values.tolist()
     indices = np.array([unique_values_list.index(x) + 1 for x in arr])
@@ -121,6 +212,7 @@ def _map_to_unique_ids(arr: NDArray):
 
 
 def _validate_pandas_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArray:
+    """Apply checks to a response matrix dataframe and convert to a 2D NDArray."""
     if response_matrix.shape[0] != len(np.unique(response_matrix.index)):
         raise ValueError("The pandas dataframe must not have duplicate index values.")
 
@@ -137,6 +229,7 @@ def _validate_pandas_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArr
 
 
 def _validate_numpy_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArray:
+    """Convert a response matrix to an NDArray, apply checks, and return the NDArray."""
     try:
         mat = np.asarray(response_matrix)
     except Exception as exc:
@@ -149,6 +242,7 @@ def _validate_numpy_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArra
 
 
 def _validate_vector(arr: NDArray, label: str) -> NDArray:
+    """Convert argument to an NDArray, check that it is 1D, and return the NDArray."""
     try:
         arr = np.array(arr)
     except Exception as exc:
@@ -162,6 +256,7 @@ def _validate_vector(arr: NDArray, label: str) -> NDArray:
 
 
 def _validate_responses_by_item(y: NDArray, ii_ints: NDArray, ii_labels: NDArray) -> NDArray:
+    """Apply checks to 1D NDArray of item responses and return the max score per item."""
     max_per_item = np.zeros(max(ii_ints))
 
     for u in np.unique(ii_ints):
