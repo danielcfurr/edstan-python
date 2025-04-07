@@ -20,7 +20,10 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent"
 ]
-urls = { "Homepage" = "https://github.com/danielcfurr/edstan-python" }
+urls = [
+  { "Homepage" = "https://github.com/danielcfurr/edstan-python" },
+  { "Reference" = "https://edstan-python.readthedocs.io/en/latest/"}
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
