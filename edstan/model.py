@@ -80,8 +80,8 @@ class EdStanModel(CmdStanModel):
             if 'integerize' is set to False.
         :param y: A 1D NumPy array representing the scored responses. The lowest value is expected to be
             zero.
-        :param integerize: Whether to convert 'ii' and 'jj' to index vectors starting at one. This should generally
-            be set to True.
+        :param integerize: Whether to convert 'ii' and 'jj' to index arrays starting at one. This should generally
+            be set to True but need not be if 'ii' and 'jj' are already formatted this way.
         :param kwargs: Additional arguments passed to :meth:`pystan.CmdStanModel.sample`, excluding 'data'. Consider
             arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
