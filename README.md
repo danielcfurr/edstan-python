@@ -11,8 +11,7 @@ Features
 - Posterior summaries tailored to item response models
 
 
-Installation
-------------
+## Installation
 
 **edstan** depends on the successful installation of **pystan**, so please see the
 [pystan installation guide](https://pystan.readthedocs.io/en/latest/installation.html).
@@ -24,6 +23,10 @@ Note that compatibility with Windows OS
 ```bash
 pip install edstan
 ```
+
+## API Reference
+
+The API reference may be found at [Read the Docs](https://edstan-python.readthedocs.io/en/latest/index.html).
 
 
 ## Quickstart
