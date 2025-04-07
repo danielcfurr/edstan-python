@@ -13,6 +13,7 @@ class EdStanModel(CmdStanModel):
     This class is a child of :class:`pystan.CmdStanModel` that adds functionality to load common item response models
     and accept data in common formats to perform MCMC sampling. Only the added functionality is documented here.
     """
+
     def __init__(self, model: str, **kwargs):
         """
         Initializes an :class:`EdStanModel` instance.
@@ -21,24 +22,28 @@ class EdStanModel(CmdStanModel):
         the :meth:`EdStanModel.sample_from_long` or :meth:`EdStanModel.sample_from_wide` methods may be used to
         initiate MCMC sampling with Stan.
 
-        :param model: The (partial) file name of an :mod:`edstan` model, with matching based on the start of the file name.
-            Consider specifying "rasch", "2pl", "rsm", "grsm", "pcm", or "gpcm".
+        :param model: The (partial) file name of an :mod:`edstan` model, with matching based on the start of the file
+            name. Consider specifying "rasch", "2pl", "rsm", "grsm", "pcm", or "gpcm".
         :param kwargs: Additional optional arguments passed to the :class:`pystan.CmdStanModel` parent class.
         """
         if not isinstance(model, str):
             raise ValueError("Invalid value for 'model'. Expected a string.")
 
-        directory = os.path.join(os.path.dirname(__file__), 'data')
+        directory = os.path.join(os.path.dirname(__file__), "data")
         matching_files = []
         for filename in os.listdir(directory):
-            if filename.endswith('.stan') and filename.startswith(model.lower()):
+            if filename.endswith(".stan") and filename.startswith(model.lower()):
                 matching_files.append(os.path.join(directory, filename))
 
         if len(matching_files) == 0:
-            raise ValueError(f"Invalid value for 'model': {model}. No matching edstan model found.")
+            raise ValueError(
+                f"Invalid value for 'model': {model}. No matching edstan model found."
+            )
 
         if len(matching_files) > 1:
-            raise ValueError(f"Invalid value for 'model': {model}. More than one matching edstan model found.")
+            raise ValueError(
+                f"Invalid value for 'model': {model}. More than one matching edstan model found."
+            )
 
         self.model = matching_files[0]
         super().__init__(stan_file=matching_files[0], **kwargs)
@@ -48,25 +53,30 @@ class EdStanModel(CmdStanModel):
         Sample from the model using a dictionary of data.
 
         Generally it will be more convenient to initialize sampling using the :meth:`EdStanModel.sample_from_long`
-        or :meth:`EdStanModel.sample_from_wide` methods, which prepare the required dictionary based on common data formats.
+        or :meth:`EdStanModel.sample_from_wide` methods, which prepare the required dictionary based on common data
+        formats.
 
         :param data: A dictionary of data compatible with the :mod:`edstan` models.
         :param kwargs: Additional arguments passed to :meth:`pystan.CmdStanModel.sample`, excluding 'data'. Consider
             arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
         """
-        ii_labels = data.pop('ii_labels')
-        jj_labels = data.pop('jj_labels')
-        max_per_item = data.pop('max_per_item')
+        ii_labels = data.pop("ii_labels")
+        jj_labels = data.pop("jj_labels")
+        max_per_item = data.pop("max_per_item")
         mcmc = super().sample(data=data, **kwargs)
-        return EdStanMCMC(mcmc, jj_labels=jj_labels, ii_labels=ii_labels, max_per_item=max_per_item)
+        return EdStanMCMC(
+            mcmc, jj_labels=jj_labels, ii_labels=ii_labels, max_per_item=max_per_item
+        )
 
-    def sample_from_long(self,
-                         ii: NDArray,
-                         jj: NDArray,
-                         y: NDArray[np.integer],
-                         integerize: bool = True, **kwargs
-                         ) -> EdStanMCMC:
+    def sample_from_long(
+        self,
+        ii: NDArray,
+        jj: NDArray,
+        y: NDArray[np.integer],
+        integerize: bool = True,
+        **kwargs,
+    ) -> EdStanMCMC:
         """
         Sample from the model using response data in the form of several 1D arrays.
 
@@ -86,13 +96,15 @@ class EdStanModel(CmdStanModel):
             arguments such as 'chains', 'iter_warmup', 'iter_sampling', and 'adapt_delta'.
         :return: A fitted MCMC model.
         """
-        ii = _validate_vector(ii, label='ii')
-        jj = _validate_vector(jj, label='jj')
-        y = _validate_vector(y, label='y')
+        ii = _validate_vector(ii, label="ii")
+        jj = _validate_vector(jj, label="jj")
+        y = _validate_vector(y, label="y")
         data = data_from_long(ii=ii, jj=jj, y=y, integerize=integerize, extended=True)
         return self.sample_from_dict(data, **kwargs)
 
-    def sample_from_wide(self, response_matrix: Union[NDArray[np.integer], DataFrame], **kwargs) -> EdStanMCMC:
+    def sample_from_wide(
+        self, response_matrix: Union[NDArray[np.integer], DataFrame], **kwargs
+    ) -> EdStanMCMC:
         """
         Sample from the model using response data in the form of a 2D array or :class:`pandas.DataFrame`.
 
@@ -109,12 +121,13 @@ class EdStanModel(CmdStanModel):
         return self.sample_from_dict(data, **kwargs)
 
 
-def data_from_long(ii: NDArray,
-                   jj: NDArray,
-                   y: NDArray[np.integer],
-                   integerize: bool = True,
-                   extended: bool = False,
-                   ) -> Dict:
+def data_from_long(
+    ii: NDArray,
+    jj: NDArray,
+    y: NDArray[np.integer],
+    integerize: bool = True,
+    extended: bool = False,
+) -> Dict:
     """
     Create a dictionary compatible with the :mod:`edstan` models from several 1D arrays.
 
@@ -134,9 +147,9 @@ def data_from_long(ii: NDArray,
         to False if called by the user.
     :return: A dictionary representing item response data.
     """
-    ii = _validate_vector(ii, label='ii')
-    jj = _validate_vector(jj, label='jj')
-    y = _validate_vector(y, label='y')
+    ii = _validate_vector(ii, label="ii")
+    jj = _validate_vector(jj, label="jj")
+    y = _validate_vector(y, label="y")
 
     if not len(ii) == len(jj) == len(y):
         raise ValueError("'ii', 'jj', and 'y' must all have the same length.")
@@ -162,16 +175,20 @@ def data_from_long(ii: NDArray,
     }
 
     if extended:
-        data.update({
-            "ii_labels": ii_labels,
-            "jj_labels": jj_labels,
-            "max_per_item": max_per_item
-        })
+        data.update(
+            {
+                "ii_labels": ii_labels,
+                "jj_labels": jj_labels,
+                "max_per_item": max_per_item,
+            }
+        )
 
     return data
 
 
-def data_from_wide(response_matrix: Union[NDArray[np.integer], DataFrame], extended: bool = False) -> Dict:
+def data_from_wide(
+    response_matrix: Union[NDArray[np.integer], DataFrame], extended: bool = False
+) -> Dict:
     """
     Create a dictionary compatible with the :mod:`edstan` models from a response matrix.
 
@@ -221,10 +238,14 @@ def _validate_pandas_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArr
         raise ValueError("The pandas dataframe must not have duplicate column names.")
 
     if response_matrix.index.nlevels != 1:
-        raise ValueError("The pandas dataframe must not have a multi-index along the rows.")
+        raise ValueError(
+            "The pandas dataframe must not have a multi-index along the rows."
+        )
 
     if response_matrix.columns.nlevels != 1:
-        raise ValueError("The pandas dataframe must not have a multi-index along the columns.")
+        raise ValueError(
+            "The pandas dataframe must not have a multi-index along the columns."
+        )
 
     return _validate_numpy_matrix(response_matrix)
 
@@ -235,10 +256,13 @@ def _validate_numpy_matrix(response_matrix: Union[NDArray, DataFrame]) -> NDArra
         mat = np.asarray(response_matrix)
     except Exception as exc:
         raise ValueError(
-            "'response_matrix' must be a 2-dimensional numpy array or an object convertable to the same.") from exc
+            "'response_matrix' must be a 2-dimensional numpy array or an object convertable to the same."
+        ) from exc
 
     if mat.ndim != 2:
-        raise ValueError(f"'response_matrix' has {mat.ndim} dimensions, but must have two.")
+        raise ValueError(
+            f"'response_matrix' has {mat.ndim} dimensions, but must have two."
+        )
     return mat
 
 
@@ -248,15 +272,20 @@ def _validate_vector(arr: NDArray, label: str) -> NDArray:
         arr = np.array(arr)
     except Exception as exc:
         raise ValueError(
-            f"'{label}' must be a 1-dimensional numpy array or an object convertable to the same.") from exc
+            f"'{label}' must be a 1-dimensional numpy array or an object convertable to the same."
+        ) from exc
 
     if arr.ndim != 1:
-        raise ValueError(f"'{label}' must be a 1-dimensional numpy array or an object convertable to the same.")
+        raise ValueError(
+            f"'{label}' must be a 1-dimensional numpy array or an object convertable to the same."
+        )
 
     return arr
 
 
-def _validate_responses_by_item(y: NDArray, ii_ints: NDArray, ii_labels: NDArray) -> NDArray:
+def _validate_responses_by_item(
+    y: NDArray, ii_ints: NDArray, ii_labels: NDArray
+) -> NDArray:
     """Apply checks to 1D NDArray of item responses and return the max score per item."""
     max_per_item = np.zeros(max(ii_ints))
 

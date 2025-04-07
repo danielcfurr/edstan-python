@@ -58,3 +58,5 @@ edstan/data/*
 !edstan/data/*.stan
 
 bernoulli*
+
+build/*

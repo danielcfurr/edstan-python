@@ -71,7 +71,7 @@ Alternatively, this is an example of using long format data:
 
    from edstan import EdStanModel
    import numpy as np
-   import pandas pd
+   import pandas as pd
 
    # Simulate a "long format" data frame of item responses for
    # 5 items and 100 persons. Responses are scored 0, 1, or 2.
