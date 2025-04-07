@@ -1,0 +1,5 @@
+numpy~=2.2.4
+pandas~=2.2.3
+pytest~=8.3.5
+cmdstanpy~=1.2.5
+setuptools~=75.8.2

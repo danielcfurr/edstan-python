@@ -46,7 +46,17 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
-edstan/__pycache__/*
 test.py
 temp.py
 .spyproject/*
+
+.idea/*
+env/*
+*__pycache__*
+
+edstan/data/*
+!edstan/data/*.stan
+
+bernoulli*
+
+build/*

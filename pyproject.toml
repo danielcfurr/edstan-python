@@ -1,0 +1,37 @@
+[tool.pylint]
+max-line-length = 120
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "edstan"
+version = "0.2.0"
+description = "Streamlines the fitting of common Bayesian item response theory models using Stan"
+readme = "README.md"
+authors = [
+  { name = "Daniel C. Furr", email = "danielcfurr@berkeley.edu" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+urls = { "Homepage" = "https://github.com/danielcfurr/edstan-python" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["edstan"]
+
+[tool.setuptools.package-data]
+edstan = [
+  "data/rasch_latent_reg.stan",
+  "data/2pl_latent_reg.stan",
+  "data/rsm_latent_reg.stan",
+  "data/grsm_latent_reg.stan",
+  "data/pcm_latent_reg.stan",
+  "data/gpcm_latent_reg.stan"
+]
